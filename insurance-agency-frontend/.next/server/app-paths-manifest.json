@@ -1,0 +1,10 @@
+{
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/(dashboard)/policies/page": "app/(dashboard)/policies/page.js",
+  "/(dashboard)/claims/page": "app/(dashboard)/claims/page.js",
+  "/(dashboard)/customers/page": "app/(dashboard)/customers/page.js",
+  "/(dashboard)/agency/page": "app/(dashboard)/agency/page.js",
+  "/(dashboard)/audit-logs/page": "app/(dashboard)/audit-logs/page.js",
+  "/(dashboard)/kyc-review/page": "app/(dashboard)/kyc-review/page.js",
+  "/(dashboard)/settings/users/page": "app/(dashboard)/settings/users/page.js"
+}
