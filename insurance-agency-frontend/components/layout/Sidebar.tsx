@@ -41,6 +41,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ['Branch Manager', 'Agency Admin'],
     submenu: [
       { href: '/reports/pnl', label: 'P&L Report', icon: TrendingUp },
+      { href: '/reports/revenue', label: 'Revenue Breakdown', icon: FileText },
       { href: '/reports/commissions', label: 'Commissions', icon: HandCoins },
       { href: '/reports/sales', label: 'Sales Summary', icon: BarChart2 },
       { href: '/reports/policies', label: 'Policies', icon: FileText },

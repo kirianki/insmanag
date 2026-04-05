@@ -36,10 +36,24 @@ ALLOWED_HOSTS = ['*']
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
     "http://localhost",
+    "http://127.0.0.1",
     "http://localhost:3001",
+    "http://127.0.0.1:3001",
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://insmanag_frontend:3000",
+    "http://192.168.100.151",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://192.168.100.151",
 ]
 
@@ -136,7 +150,7 @@ WSGI_APPLICATION = 'insurance_agency_project.wsgi.application'
 # <-- ADD THIS LINE
 # Tell Django that it is being served from a sub-path.
 # All generated URLs (redirects, etc.) will now be prefixed with /api.
-FORCE_SCRIPT_NAME = '/api'
+# FORCE_SCRIPT_NAME = '/api'
 
 
 # Database

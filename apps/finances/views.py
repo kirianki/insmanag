@@ -287,8 +287,11 @@ class PayrollRunViewSet(AuditLogMixin, viewsets.ModelViewSet):
                         'amount': amount
                     })
                 
-                # 4. Net Pay
+                # 4. Net Pay - for ACTUAL payment logic
                 net_pay = base_pay + commission_pay - deductions_total
+                
+                # 5. Gross Pay - for ACCOUNTING (P&L) expense logic
+                gross_pay = base_pay + commission_pay # We could also add bonus here if bonus model existed
                 
                 payment = StaffPayment.objects.create(
                     payroll_run=payroll_run,
@@ -308,7 +311,8 @@ class PayrollRunViewSet(AuditLogMixin, viewsets.ModelViewSet):
                         amount=detail['amount']
                     )
                 
-                total_payout += net_pay
+                # P&L Expense should be the GROSS pay
+                total_payout += gross_pay
                 
                 # We do NOT mark commissions as paid yet. Only on 'approve' of payroll.
             
@@ -400,7 +404,9 @@ class AgencyRevenueViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = AgencyRevenue.objects.filter(agency=self.request.user.agency)
+        qs = AgencyRevenue.objects.filter(agency=self.request.user.agency).select_related(
+            'policy__customer', 'policy__provider', 'policy__policy_type'
+        )
         if self.request.user.branch:
             qs = qs.filter(policy__branch=self.request.user.branch)
         return qs.order_by('-date_recognized')

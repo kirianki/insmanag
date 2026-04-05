@@ -26,6 +26,14 @@ const reportCategories = [
         bgColor: 'bg-green-50',
       },
       {
+        name: 'Full Revenue Breakdown',
+        description: 'Detailed view of all agency revenue at policy and customer level',
+        href: '/reports/revenue',
+        icon: FileText,
+        color: 'text-emerald-600',
+        bgColor: 'bg-emerald-50',
+      },
+      {
         name: 'Commissions',
         description: 'Agent commissions by status and period',
         href: '/reports/commissions',

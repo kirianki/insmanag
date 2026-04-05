@@ -58,6 +58,7 @@ export interface AgencyRevenue {
     source_policy_number: string;
     provider_name?: string;
     policy_type_name?: string;
+    customer_name?: string;
 }
 
 export interface DeductionType {
