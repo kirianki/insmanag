@@ -20,3 +20,7 @@ class Notification(UUIDModel, TimestampedModel):
 
     def __str__(self):
         return f"For {self.user.email}: {self.message[:40]}..."
+
+
+# Import reminder models to register them with Django
+from .reminder_models import ReminderTemplate, ReminderLog, ReminderSettings

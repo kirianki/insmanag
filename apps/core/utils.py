@@ -17,3 +17,15 @@ class CustomJSONEncoder(json.JSONEncoder):
             return obj.isoformat()
         # Let the base class default method raise the TypeError for other types.
         return super().default(obj)
+
+
+def get_ip_from_request(request):
+    """Helper to extract the client's IP address from a request object."""
+    if not request:
+        return None
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip

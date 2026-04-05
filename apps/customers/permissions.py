@@ -4,35 +4,62 @@ from rest_framework.permissions import BasePermission
 class IsLeadInScope(BasePermission):
     """
     Object-level permission to only allow users to access leads
-    that are within their defined scope. This is a specific version
-
-    of the global IsObjectInScope, tailored for the Lead model which
-    lacks a direct 'branch' foreign key.
-
-    - Superuser: Can access any lead.
-    - Agency Admin: Can access leads within their own agency.
-    - Branch Manager: Can access leads where the assigned agent belongs to their branch.
-    - Agent: Can only access leads directly assigned to them.
+    that are within their defined scope. 
     """
     def has_object_permission(self, request, view, obj):
         user = request.user
 
-        # Superusers can always access any object
         if user.is_superuser:
             return True
         
-        # Agency Admin scope: Check if the lead's agency matches the user's agency.
+        # Check IDs directly to avoid object comparison issues
         if user.is_agency_admin:
-            return obj.agency == user.agency
+            return obj.agency_id == user.agency_id
 
-        # Branch Manager scope: Check if the lead's assigned agent belongs to the user's branch.
-        # This is the key logic that fixes the conversion bug.
         if user.is_branch_manager:
-            return obj.assigned_agent.branch == user.branch
+            # Ensure branch exists on both sides
+            if user.branch_id and obj.assigned_agent.branch_id == user.branch_id:
+                return True
 
-        # Agent scope: Check if the lead is directly assigned to the user.
         if user.is_agent:
-            return obj.assigned_agent == user
+            return obj.assigned_agent_id == user.id
 
-        # Deny by default if no scope matches
+        return False
+
+class IsRenewalInScope(BasePermission):
+    """
+    Object-level permission for Renewals.
+    
+    Since the Renewal model does not have direct 'agency' or 'branch' fields,
+    scope validation must traverse through the related 'customer' object.
+    
+    This implementation uses ID comparison and fall-through logic to handle
+    users who might have multiple roles (e.g. Manager AND Agent).
+    """
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+
+        # 1. Superuser: Full Access
+        if user.is_superuser:
+            return True
+        
+        # 2. Agency Admin: Access if customer belongs to their agency
+        if user.is_agency_admin:
+            if obj.customer.agency_id == user.agency_id:
+                return True
+            # Do not return False here; allow fall-through in case of weird role combos
+
+        # 3. Branch Manager: Access if customer belongs to their branch
+        if user.is_branch_manager:
+            # Use IDs for safe comparison. 
+            # Ensure user has a branch and it matches the customer's branch.
+            if user.branch_id and obj.customer.branch_id == user.branch_id:
+                return True
+
+        # 4. Agent: Access if they created it OR are assigned to the customer
+        if user.is_agent:
+            if obj.created_by_id == user.id or obj.customer.assigned_agent_id == user.id:
+                return True
+
+        # If none of the above conditions were met, deny access.
         return False

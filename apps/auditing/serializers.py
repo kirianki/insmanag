@@ -8,9 +8,9 @@ class SystemLogSerializer(serializers.ModelSerializer):
     Provides a read-only representation of an audit log entry.
     """
     # Provide human-readable context for the user who performed the action.
-    user_email = serializers.CharField(source='user.email', read_only=True, default='System/Deleted User')
-    branch_name = serializers.CharField(source='branch.branch_name', read_only=True, default='N/A')
-    agency_name = serializers.CharField(source='agency.agency_name', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True, allow_null=True, default='System/Deleted User')
+    branch_name = serializers.CharField(source='branch.branch_name', read_only=True, allow_null=True, default='N/A')
+    # Use the cached agency_name field from the model (not the related object)
     
     class Meta:
         model = SystemLog

@@ -6,6 +6,7 @@ from ..models import StaffCommission, ProviderCommissionStructure, StaffCommissi
 from .factories import ProviderCommissionStructureFactory, StaffCommissionRuleFactory, StaffCommissionFactory
 from apps.policies.tests.factories import PolicyFactory
 from apps.accounts.tests.factories import UserFactory, AgencyFactory
+from apps.customers.tests.factories import CustomerFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -13,13 +14,14 @@ class TestCommissionService:
     def test_generate_commission_based_on_total_premium(self):
         policy = PolicyFactory(premium_amount=Decimal('10000.00'))
         ProviderCommissionStructureFactory(
+            agency=policy.agency,
             provider=policy.provider,
             policy_type=policy.policy_type,
             rate_percentage=Decimal('10.00')
         )
         StaffCommissionRuleFactory(
+            agency=policy.agent.agency,
             user=policy.agent,
-            provider=policy.provider,
             policy_type=policy.policy_type,
             payout_basis=StaffCommissionRule.PayoutBasis.TOTAL_PREMIUM,
             rate_percentage=Decimal('2.50')
@@ -33,11 +35,13 @@ class TestCommissionService:
     def test_generate_commission_based_on_agency_commission(self):
         policy = PolicyFactory(premium_amount=Decimal('10000.00'))
         ProviderCommissionStructureFactory(
+            agency=policy.agency,
             provider=policy.provider,
             policy_type=policy.policy_type,
             rate_percentage=Decimal('12.00')
         )
         StaffCommissionRuleFactory(
+            agency=policy.agent.agency,
             user=policy.agent,
             payout_basis=StaffCommissionRule.PayoutBasis.AGENCY_COMMISSION,
             rate_percentage=Decimal('20.00')
@@ -48,14 +52,44 @@ class TestCommissionService:
         commission = StaffCommission.objects.get(agent=policy.agent, policy=policy)
         assert commission.commission_amount == Decimal('240.00')
 
+    def test_generate_commission_using_agency_default_rule(self):
+        """
+        Verify that if no rule exists for a specific user, 
+        the agency default rule (user=None) is used.
+        """
+        agency = AgencyFactory()
+        agent = UserFactory(agency=agency)
+        customer = CustomerFactory(agency=agency, assigned_agent=agent)
+        policy = PolicyFactory(premium_amount=Decimal('10000.00'), customer=customer)
+        
+        ProviderCommissionStructureFactory(
+            agency=agency,
+            provider=policy.provider,
+            policy_type=policy.policy_type,
+            rate_percentage=Decimal('10.00')
+        )
+        
+        # Create an agency-wide default rule
+        StaffCommissionRuleFactory(
+            agency=agency,
+            user=None,
+            payout_basis=StaffCommissionRule.PayoutBasis.TOTAL_PREMIUM,
+            rate_percentage=Decimal('5.00')
+        )
+
+        CommissionService.generate_for_policy(policy)
+        
+        commission = StaffCommission.objects.get(agent=agent, policy=policy)
+        assert commission.commission_amount == Decimal('500.00')
+
     def test_generate_upline_commission(self):
         manager = UserFactory()
-        agent = UserFactory(manager=manager)
-        policy = PolicyFactory(premium_amount=Decimal('20000.00'), agent=agent)
+        agent = UserFactory(manager=manager, agency=manager.agency)
+        policy = PolicyFactory(premium_amount=Decimal('20000.00'), agent=agent, agency=agent.agency)
         
-        ProviderCommissionStructureFactory(provider=policy.provider, policy_type=policy.policy_type)
-        StaffCommissionRuleFactory(user=agent, rate_percentage=Decimal('3.00'))
-        StaffCommissionRuleFactory(user=manager, rate_percentage=Decimal('1.00'))
+        ProviderCommissionStructureFactory(provider=policy.provider, policy_type=policy.policy_type, agency=policy.agency)
+        StaffCommissionRuleFactory(user=agent, agency=agent.agency, rate_percentage=Decimal('3.00'))
+        StaffCommissionRuleFactory(user=manager, agency=manager.agency, rate_percentage=Decimal('1.00'))
 
         CommissionService.generate_for_policy(policy)
 
@@ -70,7 +104,7 @@ class TestCommissionService:
 
     def test_raises_error_if_no_provider_structure(self):
         policy = PolicyFactory()
-        with pytest.raises(CommissionGenerationError, match="No ProviderCommissionStructure found"):
+        with pytest.raises(CommissionGenerationError, match="No Provider Commission Structure found"):
             CommissionService.generate_for_policy(policy)
 
 class TestPayoutService:
@@ -80,10 +114,10 @@ class TestPayoutService:
         agent1 = UserFactory(agency=agency)
         agent2 = UserFactory(agency=agency)
 
-        StaffCommissionFactory(agent=agent1, status=StaffCommission.Status.APPROVED, commission_amount=100)
-        StaffCommissionFactory(agent=agent2, status=StaffCommission.Status.APPROVED, commission_amount=150)
-        StaffCommissionFactory(agent=agent1, status=StaffCommission.Status.PENDING_APPROVAL, commission_amount=50)
-        StaffCommissionFactory(status=StaffCommission.Status.APPROVED)
+        StaffCommissionFactory(agent=agent1, agency=agency, status=StaffCommission.Status.APPROVED, commission_amount=100)
+        StaffCommissionFactory(agent=agent2, agency=agency, status=StaffCommission.Status.APPROVED, commission_amount=150)
+        StaffCommissionFactory(agent=agent1, agency=agency, status=StaffCommission.Status.PENDING_APPROVAL, commission_amount=50)
+        StaffCommissionFactory(status=StaffCommission.Status.APPROVED, agency=AgencyFactory()) # Different agency
 
         batch = PayoutService.create_payout_batch(agency, admin)
 

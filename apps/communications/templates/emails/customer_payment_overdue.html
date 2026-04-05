@@ -1,0 +1,29 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<p>Hello {{ customer_name }},</p>
+
+<p style="color: #e74c3c; font-size: 18px; font-weight: bold;">URGENT: Your payment is overdue</p>
+
+<p>Our records show that the payment for your policy <strong>{{ policy_number }}</strong> is now <span
+        class="highlight">{{ days_overdue }} days past due</span>.</p>
+
+<div class="info-box" style="border-left-color: #e74c3c;">
+    <p><strong>Overdue Information:</strong></p>
+    <ul>
+        <li><strong>Amount Overdue:</strong> KES {{ installment_amount }}</li>
+        <li><strong>Original Due Date:</strong> {{ due_date }}</li>
+    </ul>
+</div>
+
+<p><strong>Why this matters:</strong> Continued non-payment may lead to a lapse in your insurance coverage, leaving you
+    unprotected in case of an incident.</p>
+
+<p>Please make the payment immediately to restore your policy's good standing. If you are experiencing difficulties,
+    please reach out to your agent as soon as possible.</p>
+
+<p>If you have recently made this payment, it may still be processing. Please feel free to update us.</p>
+
+<p>Best regards,<br>
+    The Insurance Team</p>
+{% endblock %}

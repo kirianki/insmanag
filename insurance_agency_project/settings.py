@@ -1,3 +1,5 @@
+# File: insurance_agency_project/settings.py
+
 """
 Django settings for insurance_agency_project project.
 
@@ -22,7 +24,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-m-aiipr$+8#n5@gakvm!0vydl(teiy2f2)z^3bg%=g=uew8cp4'
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-m-aiipr$+8#n5@gakvm!0vydl(teiy2f2)z^3bg%=g=uew8cp4')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -33,13 +36,16 @@ ALLOWED_HOSTS = ['*']
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://localhost",
     "http://localhost:3001",
     "http://localhost:5173",
     "http://insmanag_frontend:3000",
+    "http://192.168.100.151",
 ]
 
 
-
+AFRICASTALKING_USERNAME = os.environ.get('AFRICASTALKING_USERNAME', 'sandbox') # Default to sandbox
+AFRICASTALKING_API_KEY = os.environ.get('AFRICASTALKING_API_KEY')
 # Application definition
 
 INSTALLED_APPS = [
@@ -66,6 +72,7 @@ INSTALLED_APPS = [
     'apps.analytics',
     'apps.claims',
     'apps.reportings',
+    'apps.finances',
 ]
 
 MIDDLEWARE = [
@@ -97,6 +104,10 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
+SIMPLE_JWT = {
+    "SIGNING_KEY": SECRET_KEY,
+}
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "Insurance Agency API",
     "DESCRIPTION": "API for managing agencies, branches, and users with role-based access control.",
@@ -122,6 +133,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'insurance_agency_project.wsgi.application'
 
+# <-- ADD THIS LINE
+# Tell Django that it is being served from a sub-path.
+# All generated URLs (redirects, etc.) will now be prefixed with /api.
+FORCE_SCRIPT_NAME = '/api'
+
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
@@ -139,6 +155,57 @@ DATABASES = {
 # Redis & Celery
 CELERY_BROKER_URL = f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', 6379)}/0"
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+
+# --- ADD THIS NEW SETTING ---
+# Explicitly tell Celery where to find our tasks.
+CELERY_IMPORTS = (
+    'apps.policies.tasks',
+    'apps.auditing.tasks',
+    'apps.commissions.tasks',
+    'apps.communications.reminder_tasks',
+)
+# --- CORRECTED CELERY BEAT SCHEDULE ---
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    # Existing tasks
+    'send-daily-policy-expiry-reminders': {
+        'task': 'apps.policies.tasks.send_daily_policy_expiry_reminders',
+        'schedule': crontab(hour=10, minute=0), # Adjusted to not overlap
+    },
+    'update-expired-policies-status-frequently': {
+        'task': 'apps.policies.tasks.update_expired_policies_status',
+        'schedule': crontab(hour='*/2', minute=5),
+    },
+    
+    # --- NEW CUSTOMER REMINDER TASKS ---
+    'customer-payment-reminders': {
+        'task': 'apps.communications.tasks.send_customer_payment_reminders',
+        'schedule': crontab(hour=9, minute=0),
+    },
+    'customer-overdue-reminders': {
+        'task': 'apps.communications.tasks.send_customer_overdue_reminders',
+        'schedule': crontab(hour=10, minute=0),
+    },
+    'customer-expiry-reminders-multi-stage': {
+        'task': 'apps.communications.tasks.send_customer_policy_expiry_reminders',
+        'schedule': crontab(hour=9, minute=30),
+    },
+
+    # --- NEW AGENT REMINDER TASKS ---
+    'agent-daily-summary': {
+        'task': 'apps.communications.tasks.send_agent_daily_summary',
+        'schedule': crontab(hour=8, minute=0, day_of_week='1-5'),
+    },
+    'agent-urgent-alerts': {
+        'task': 'apps.communications.tasks.send_agent_urgent_alerts',
+        'schedule': crontab(hour='*/6', minute=0),
+    },
+    'agent-renewal-opportunities': {
+        'task': 'apps.communications.tasks.send_agent_renewal_opportunities',
+        'schedule': crontab(hour=9, minute=0, day_of_week='1'),
+    },
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -176,6 +243,15 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# The absolute path to the directory where collectstatic will collect static files for deployment.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Optional but good practice: Tell Django where to find your project's own static files.
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -196,3 +272,12 @@ REPORTS_TEMP_DIR.mkdir(exist_ok=True)
 REPORT_MAX_RECORDS_PDF = 500
 REPORT_MAX_RECORDS_EXCEL = 10000
 REPORT_MAX_RECORDS_CSV = 100000
+
+# Email Configuration (Placeholders - configured via .env)
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Insurance Agency <noreply@example.com>')

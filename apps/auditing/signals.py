@@ -1,16 +1,9 @@
 # apps/auditing/signals.py
 from django.dispatch import receiver
 from django.contrib.auth.signals import user_logged_in
+from apps.core.utils import get_ip_from_request
 from .tasks import create_system_log
 
-def get_ip_from_request(request):
-    """Helper to extract the client's IP address from a request object."""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0]
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-    return ip
 
 # --- Listener for User Logins ---
 # This is the perfect use case for a signal and should be kept.
@@ -22,6 +15,7 @@ def log_user_login(sender, request, user, **kwargs):
         
     log_data = {
         "agency_id": user.agency_id,
+        "agency_name": user.agency.agency_name if user.agency else None,
         "branch_id": user.branch_id,
         "user_id": user.id,
         "action_type": "USER_LOGIN_SUCCESS",

@@ -20,7 +20,7 @@ class ProviderCommissionStructureSerializer(serializers.ModelSerializer):
 class StaffCommissionRuleSerializer(serializers.ModelSerializer):
     class Meta:
         model = StaffCommissionRule
-        fields = ['id', 'user', 'policy_type', 'payout_basis', 'rate_percentage']
+        fields = ['id', 'user', 'policy_type', 'payout_basis', 'rate_percentage', 'monthly_threshold']
 
 class PayoutBatchSerializer(serializers.ModelSerializer):
     initiated_by_email = serializers.CharField(source='initiated_by.email', read_only=True)
@@ -35,14 +35,13 @@ class StaffCommissionSerializer(serializers.ModelSerializer):
     policy_number = serializers.CharField(source='policy.policy_number', read_only=True)
     class Meta:
         model = StaffCommission
-        # --- MODIFIED: Added 'installment' to fields and read_only_fields ---
         fields = [
             'id', 'agent', 'policy', 'installment', 'commission_type', 'commission_amount', 
-            'status', 'payout_batch', 'created_at', 'agent_email', 'policy_number'
+            'status', 'payout_batch', 'created_at', 'agent_email', 'policy_number', 'applied_rule_details'
         ]
         read_only_fields = [
             'id', 'agent', 'policy', 'installment', 'commission_type', 
-            'commission_amount', 'payout_batch', 'created_at'
+            'commission_amount', 'payout_batch', 'created_at', 'applied_rule_details'
         ]
 
 # --- NOTE: The payment simulation serializers are no longer needed in this app ---

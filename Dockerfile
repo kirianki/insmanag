@@ -1,16 +1,20 @@
-FROM python:3.12-slim
+# File: Dockerfile
 
-# Prevent Python from writing .pyc files
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Copy project files
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt gunicorn
+
 COPY . .
 
-EXPOSE 8000
+# <-- ADD THIS
+# This command collects all static files from your Django apps
+# (including the admin panel) into the STATIC_ROOT directory.
+RUN python manage.py collectstatic --noinput
+
+CMD ["gunicorn", "insurance_agency_project.wsgi:application", "--bind", "0.0.0.0:8001"]

@@ -7,7 +7,7 @@ from apps.customers.models import Customer
 from apps.policies.models import Policy, PolicyType  # Import policies models
 from apps.claims.models import Claim, ClaimDocument  # Import claims models
 from apps.commissions.models import StaffCommission  # Import commissions models
-from apps.analytics.models import AnalyticsDashboard  # Import analytics model
+# from apps.analytics.models import AnalyticsDashboard  # Import analytics model
 
 
 # Factory for basic permissions
@@ -105,7 +105,7 @@ def get_or_create_permission(app_label, model_name, codename):
         ('claims', 'claim'): Claim,
         ('claims', 'claimdocument'): ClaimDocument,
         ('commissions', 'staffcommission'): StaffCommission,
-        ('analytics', 'analyticsdashboard'): AnalyticsDashboard,
+# ('analytics', 'analyticsdashboard'): AnalyticsDashboard,
     }
     model_class = model_map.get((app_label, model_name))
     if not model_class:
@@ -145,7 +145,7 @@ class AgencyAdminGroupFactory(GroupFactory):
             get_or_create_permission('claims', 'claim', 'delete_claim'),
             get_or_create_permission('claims', 'claimdocument', 'add_claimdocument'),
             get_or_create_permission('commissions', 'staffcommission', 'can_approve_commission'),
-            get_or_create_permission('analytics', 'analyticsdashboard', 'view_dashboard_summary'),
+            # get_or_create_permission('analytics', 'analyticsdashboard', 'view_dashboard_summary'),
         ]
         self.permissions.add(*perms_to_add)
         if create:
@@ -179,7 +179,7 @@ class ManagerGroupFactory(GroupFactory):
             get_or_create_permission('claims', 'claimdocument', 'add_claimdocument'),
             # Extra permissions
             get_or_create_permission('commissions', 'staffcommission', 'can_approve_commission'),
-            get_or_create_permission('analytics', 'analyticsdashboard', 'view_dashboard_summary'),
+            # get_or_create_permission('analytics', 'analyticsdashboard', 'view_dashboard_summary'),
         ]
         self.permissions.add(*perms_to_add)
         if create:

@@ -1,7 +1,5 @@
-# apps/reports/views.py
-
 import csv
-from datetime import datetime
+from django.utils import timezone
 from django.http import HttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -22,12 +20,15 @@ def apply_date_filters(queryset, date_from_str, date_to_str, date_field='created
     filters = {}
     if date_from_str:
         try:
-            filters[f"{date_field}__date__gte"] = datetime.strptime(date_from_str, "%Y-%m-%d").date()
+            # We use make_aware to ensure the date is interpreted in the CURRENT time zone
+            dt = timezone.datetime.strptime(date_from_str, "%Y-%m-%d")
+            filters[f"{date_field}__date__gte"] = dt.date()
         except ValueError:
             raise exceptions.ValidationError({"date_from": "Invalid date format. Use YYYY-MM-DD."})
     if date_to_str:
         try:
-            filters[f"{date_field}__date__lte"] = datetime.strptime(date_to_str, "%Y-%m-%d").date()
+            dt = timezone.datetime.strptime(date_to_str, "%Y-%m-%d")
+            filters[f"{date_field}__date__lte"] = dt.date()
         except ValueError:
             raise exceptions.ValidationError({"date_to": "Invalid date format. Use YYYY-MM-DD."})
     return queryset.filter(**filters)
@@ -43,9 +44,13 @@ class ReportGeneratorView(APIView):
 
     REPORT_TYPES = {
         # Summary Reports
+        'overall-sales-summary': {'func': ReportingService.generate_overall_sales_summary, 'model': Policy, 'scope_field': 'agent'},
         'sales-summary': {'func': ReportingService.generate_sales_summary_by_agent, 'model': Policy, 'scope_field': 'agent'},
+        'sales-summary-by-type': {'func': ReportingService.generate_sales_summary_by_policy_type, 'model': Policy, 'scope_field': 'agent'},
+        'sales-summary-by-provider': {'func': ReportingService.generate_sales_summary_by_provider, 'model': Policy, 'scope_field': 'agent'},
         'commissions-summary': {'func': ReportingService.generate_commissions_summary_by_agent, 'model': StaffCommission, 'scope_field': 'agent'},
         'leads-summary': {'func': ReportingService.generate_lead_performance_summary_by_agent, 'model': Lead, 'scope_field': 'assigned_agent'},
+        'claims-summary-overall': {'func': ReportingService.generate_overall_claims_summary, 'model': Claim, 'scope_field': 'policy__agent'},
         
         # Detail Reports
         'policies-detail': {'func': ReportingService.generate_policies_detail_report, 'model': Policy, 'scope_field': 'agent'},
@@ -60,6 +65,7 @@ class ReportGeneratorView(APIView):
             OpenApiParameter(name='report_type', location='path', description="Type of report to generate. Available: " + ", ".join(REPORT_TYPES.keys()), required=True, type=str),
             OpenApiParameter(name='date_from', description='Start date for filtering (YYYY-MM-DD)', required=False, type=str),
             OpenApiParameter(name='date_to', description='End date for filtering (YYYY-MM-DD)', required=False, type=str),
+            OpenApiParameter(name='interval', description="Grouping interval for summary reports: 'daily', 'monthly', 'yearly'.", required=False, type=str),
             OpenApiParameter(name='format', description="Output format. Either 'json' (default) or 'csv'.", required=False, type=str),
             OpenApiParameter(name='status', description="Filter by status (for policies-detail, claims-detail).", required=False, type=str),
             OpenApiParameter(name='kyc_status', description="Filter by kyc_status (for customers-detail).", required=False, type=str),
@@ -69,6 +75,11 @@ class ReportGeneratorView(APIView):
     def get(self, request, report_type, *args, **kwargs):
         if report_type not in self.REPORT_TYPES:
             raise exceptions.NotFound(f"Report type '{report_type}' not found.")
+
+        # Activate the local time zone for the duration of the request.
+        # This ensures that TruncDate, TruncMonth, and __date lookups
+        # use the correct offset when converting UTC database values.
+        timezone.activate('Africa/Nairobi')
 
         user = request.user
         report_config = self.REPORT_TYPES[report_type]
@@ -81,10 +92,10 @@ class ReportGeneratorView(APIView):
             scope_filter = {f"{scope_field}__branch": user.branch}
             qs = base_model.objects.filter(**scope_filter)
         elif user.is_agency_admin and user.agency:
-            if base_model in [Customer, Lead]:
-                 scope_filter = {'agency': user.agency}
+            if hasattr(base_model, 'agency'):
+                scope_filter = {'agency': user.agency}
             else:
-                 scope_filter = {f"{scope_field}__agency": user.agency}
+                scope_filter = {f"{scope_field}__agency": user.agency}
             qs = base_model.objects.filter(**scope_filter)
         elif user.is_superuser:
             qs = base_model.objects.all()
@@ -112,7 +123,7 @@ class ReportGeneratorView(APIView):
             return HttpResponse("No data available for this report.", content_type="text/plain", status=200)
 
         response = HttpResponse(content_type='text/csv')
-        filename = f"{report_name}_report_{datetime.now().strftime('%Y-%m-%d')}.csv"
+        filename = f"{report_name}_report_{timezone.now().strftime('%Y-%m-%d')}.csv"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
         writer = csv.writer(response)

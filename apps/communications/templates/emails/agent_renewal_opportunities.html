@@ -1,0 +1,21 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<p>Hello {{ agent_name }},</p>
+
+<p>Here are the renewal opportunities in your portfolio for the next 30-60 days. There are <strong>{{ opportunity_count
+        }}</strong> policies approaching expiry.</p>
+
+<div class="info-box">
+    <p><strong>Upcoming Expiries:</strong></p>
+    <pre style="font-family: inherit; white-space: pre-wrap;">{{ opportunities_list }}</pre>
+</div>
+
+<p>This is a great time to reach out to these customers, review their current coverage, and initiate the renewal
+    process.</p>
+
+<p>Starting the conversation early significantly improves renewal rates!</p>
+
+<p>Best regards,<br>
+    Admin System</p>
+{% endblock %}

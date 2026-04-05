@@ -1,0 +1,9 @@
+# Ignore local dev stuff
+node_modules
+npm-debug.log
+.dockerignore
+.git
+.gitignore
+.next/cache
+.env*
+!.env.local

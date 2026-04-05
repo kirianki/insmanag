@@ -4,7 +4,7 @@ from factory.django import DjangoModelFactory
 from datetime import date, timedelta
 from django.utils import timezone
 
-from ..models import InsuranceProvider, PolicyType, Policy
+from ..models import InsuranceProvider, PolicyType, Policy, PolicyInstallment
 from apps.accounts.tests.factories import AgencyFactory
 from apps.customers.tests.factories import CustomerFactory
 
@@ -42,7 +42,14 @@ class PolicyFactory(DjangoModelFactory):
     policy_start_date = factory.LazyFunction(date.today)
     policy_end_date = factory.LazyFunction(lambda: date.today() + timedelta(days=364))
     
-    # +++ IMPROVEMENT: Make created_at configurable for date filtering tests +++
-    # This defaults to the current time but can be overridden in tests.
     created_at = factory.LazyFunction(timezone.now)
     updated_at = factory.LazyFunction(timezone.now)
+
+class PolicyInstallmentFactory(DjangoModelFactory):
+    class Meta:
+        model = PolicyInstallment
+    
+    policy = factory.SubFactory(PolicyFactory)
+    due_date = factory.LazyFunction(date.today)
+    amount = factory.Faker('pydecimal', left_digits=5, right_digits=2, positive=True, min_value=1000)
+    status = PolicyInstallment.Status.PENDING

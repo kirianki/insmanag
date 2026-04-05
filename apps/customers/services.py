@@ -37,29 +37,40 @@ class LeadService:
 class KYCService:
     @staticmethod
     @transaction.atomic
-    def verify_document(document: CustomerDocument, verified_by: User):
+    @staticmethod
+    @transaction.atomic
+    def verify_document(document: CustomerDocument, verified_by: User, notes: str = None):
         """
         Verifies a single document and updates the parent customer's KYC status if all documents are now verified.
         """
+        # Always update notes if provided, even if status doesn't change
+        if notes:
+            document.notes = notes
+
         if document.verification_status == CustomerDocument.VerificationStatus.VERIFIED:
-            return document # Already verified, no change needed
+            if notes: # Save notes if they were updated
+                document.save(update_fields=['notes', 'updated_at'])
+            return document # Already verified
 
         document.verification_status = CustomerDocument.VerificationStatus.VERIFIED
         document.verified_by = verified_by
-        document.save(update_fields=['verification_status', 'verified_by', 'updated_at'])
+        document.save(update_fields=['verification_status', 'verified_by', 'notes', 'updated_at'])
         KYCService.check_and_update_customer_kyc_status(document.customer, verified_by)
         return document
 
     @staticmethod
     @transaction.atomic
-    def reject_document(document: CustomerDocument, rejected_by: User):
+    def reject_document(document: CustomerDocument, rejected_by: User, rejection_reason: str):
         """Rejects a single document and updates the parent customer's status."""
+        document.notes = rejection_reason # Always update rejection reason
+        
         if document.verification_status == CustomerDocument.VerificationStatus.REJECTED:
-            return document # Already rejected, no change needed
+             document.save(update_fields=['notes', 'updated_at'])
+             return document 
 
         document.verification_status = CustomerDocument.VerificationStatus.REJECTED
         document.verified_by = rejected_by
-        document.save(update_fields=['verification_status', 'verified_by', 'updated_at'])
+        document.save(update_fields=['verification_status', 'verified_by', 'notes', 'updated_at'])
         
         customer = document.customer
         if customer.kyc_status != Customer.KYCStatus.REJECTED:

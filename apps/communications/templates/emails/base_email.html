@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f9;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .header {
+            background-color: #2c3e50;
+            color: #ffffff;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            letter-spacing: 1px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .footer {
+            background-color: #f8f9fa;
+            color: #7f8c8d;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            border-top: 1px solid #eeeeee;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 12px 25px;
+            background-color: #3498db;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        .info-box {
+            background-color: #f9f9f9;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .highlight {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Insurance Management System</h1>
+        </div>
+        <div class="content">
+            {% block content %}{% endblock %}
+
+            {% if paybill_number %}
+            <div class="info-box" style="border-left-color: #27ae60; background-color: #f0fff4;">
+                <p><strong>Lipa na M-PESA Details:</strong></p>
+                <ul>
+                    <li><strong>Paybill Number:</strong> {{ paybill_number }}</li>
+                    <li><strong>Account Name:</strong> {{ vehicle_reg }}</li>
+                    <li>{{ agency_name }}</li>
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+        <div class="footer">
+            <p>&copy; {{ current_year|default:"2026" }} Insurance Agency. All rights reserved.</p>
+            <p>This is an automated message, please do not reply directly to this email.</p>
+        </div>
+    </div>
+</body>
+
+</html>

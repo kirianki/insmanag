@@ -1,4 +1,3 @@
-# apps/accounts/serializers.py
 from __future__ import annotations
 
 from typing import Any
@@ -9,7 +8,10 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from django.contrib.auth.signals import user_logged_in
 from .models import AGENCY_ADMIN, Agency, AgencyBranch, User, UserProfile
+from apps.auditing.tasks import create_system_log
+from apps.core.utils import get_ip_from_request
 
 
 class BaseAgencySerializer(serializers.ModelSerializer):
@@ -42,9 +44,16 @@ class RoleSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    """Handles the UserProfile model fields including file uploads."""
+    
     class Meta:
         model = UserProfile
         fields = ["phone_number", "profile_picture", "bio"]
+        extra_kwargs = {
+            'phone_number': {'required': False, 'allow_blank': True},
+            'bio': {'required': False, 'allow_blank': True},
+            'profile_picture': {'required': False, 'allow_null': True},
+        }
 
 
 class AgencySerializer(serializers.ModelSerializer):
@@ -119,6 +128,29 @@ class AgencyOnboardingSerializer(serializers.Serializer):
                 is_active=True,
             )
             admin_user.groups.add(admin_group)
+
+            # --- Audit Logging for Onboarding ---
+            request = self.context.get("request")
+            ip_address = get_ip_from_request(request) if request else None
+            
+            # Log Agency Creation
+            create_system_log.delay({
+                "agency_id": agency.id,
+                "user_id": admin_user.id,
+                "action_type": "AGENCY_ONBOARDED",
+                "details": {"agency_name": agency.agency_name, "agency_code": agency.agency_code},
+                "ip_address": ip_address
+            })
+            
+            # Log Admin User Creation
+            create_system_log.delay({
+                "agency_id": agency.id,
+                "user_id": admin_user.id,
+                "action_type": "USER_CREATED",
+                "details": {"email": admin_user.email, "role": "Agency Admin (Initial)"},
+                "ip_address": ip_address
+            })
+
             return {"agency": agency, "admin_user": admin_user}
 
 
@@ -130,6 +162,15 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         token["last_name"] = user.last_name
         token["roles"] = [g.name for g in user.groups.all()]
         return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        
+        # Trigger the user_logged_in signal so the auditing app can log it
+        request = self.context.get("request")
+        user_logged_in.send(sender=self.user.__class__, request=request, user=self.user)
+        
+        return data
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -151,7 +192,34 @@ class ChangePasswordSerializer(serializers.Serializer):
         return user
 
 
+class CurrentUserSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the current user's profile.
+    Handles both User and UserProfile fields in a single request.
+    The nested profile is read-only for GET requests.
+    """
+    profile = UserProfileSerializer(read_only=True)
+    roles = serializers.StringRelatedField(source="groups", many=True, read_only=True)
+    agency_detail = AgencySerializer(source="agency", read_only=True)
+    branch_detail = AgencyBranchSerializer(source="branch", read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id", 
+            "email", 
+            "first_name", 
+            "last_name", 
+            "profile",
+            "roles", 
+            "agency_detail", 
+            "branch_detail"
+        ]
+        read_only_fields = ["id", "email", "roles", "agency_detail", "branch_detail"]
+
+
 class UserSerializer(serializers.ModelSerializer):
+    """Full user serializer for admin operations."""
     profile = UserProfileSerializer(read_only=True)
     roles = serializers.StringRelatedField(source="groups", many=True, read_only=True)
     password = serializers.CharField(
@@ -161,7 +229,7 @@ class UserSerializer(serializers.ModelSerializer):
         many=True, queryset=Group.objects.all(), required=False, write_only=True
     )
     agency_detail = AgencySerializer(source="agency", read_only=True)
-    branch_detail = AgencyBranchSerializer(source="branch", read_only=True)  # NEW: Nested branch details for smooth frontend display
+    branch_detail = AgencyBranchSerializer(source="branch", read_only=True)
 
     class Meta:
         model = User
@@ -178,9 +246,9 @@ class UserSerializer(serializers.ModelSerializer):
             "groups",
             "roles",
             "agency_detail",
-            "branch_detail",  # NEW: Include in fields
+            "branch_detail",
         ]
-        read_only_fields = ["id", "profile", "roles", "agency_detail", "branch_detail"]  # NEW: Add to read_only
+        read_only_fields = ["id", "profile", "roles", "agency_detail", "branch_detail"]
         extra_kwargs = {
             "agency": {"write_only": True},
             "branch": {"write_only": True},

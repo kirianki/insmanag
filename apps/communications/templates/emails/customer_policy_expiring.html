@@ -1,0 +1,27 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<p>Hello {{ customer_name }},</p>
+
+<p>We wanted to let you know that your insurance policy <strong>{{ policy_number }}</strong> is expiring in <strong>{{
+        days_until_expiry }} days</strong> (on {{ policy_end_date }}).</p>
+
+<div class="info-box">
+    <p><strong>Expiring Policy:</strong></p>
+    <ul>
+        <li><strong>Policy Type:</strong> {{ policy_type }}</li>
+        <li><strong>Vehicle/Subject:</strong> {{ vehicle_reg }}</li>
+        <li><strong>Expiry Date:</strong> {{ policy_end_date }}</li>
+    </ul>
+</div>
+
+<p>To ensure continuous protection, we recommend starting the renewal process today. Your agent is ready to provide you
+    with a competitive renewal quote.</p>
+
+<a href="#" class="button">Request Renewal Quote</a>
+
+<p>Don't let your coverage lapse – renew today!</p>
+
+<p>Best regards,<br>
+    The Insurance Team</p>
+{% endblock %}

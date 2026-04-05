@@ -1,0 +1,32 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<p>Hello {{ agent_name }},</p>
+
+<p>Here is your portfolio summary for <strong>{{ summary_date }}</strong>.</p>
+
+<div style="display: flex; justify-content: space-between; margin: 20px 0;">
+    <div
+        style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; text-align: center; flex: 1; margin-right: 10px;">
+        <div style="font-size: 24px; font-weight: bold; color: #2c3e50;">{{ active_policies_count }}</div>
+        <div style="font-size: 12px; color: #7f8c8d;">Active Policies</div>
+    </div>
+    <div
+        style="background-color: #fdf2f2; padding: 15px; border-radius: 5px; text-align: center; flex: 1; margin-right: 10px;">
+        <div style="font-size: 24px; font-weight: bold; color: #e74c3c;">{{ overdue_policies_count }}</div>
+        <div style="font-size: 12px; color: #7f8c8d;">Overdue Payments</div>
+    </div>
+    <div style="background-color: #eef2ff; padding: 15px; border-radius: 5px; text-align: center; flex: 1;">
+        <div style="font-size: 24px; font-weight: bold; color: #3498db;">{{ expiring_this_month_count }}</div>
+        <div style="font-size: 12px; color: #7f8c8d;">Expiring This Month</div>
+    </div>
+</div>
+
+<p>Maintaining a proactive approach with your customers helps improve retention and relationship quality. Please review
+    your dashboard for details on specific policies needing attention.</p>
+
+<p>Good luck with your sales today!</p>
+
+<p>Best regards,<br>
+    Admin System</p>
+{% endblock %}

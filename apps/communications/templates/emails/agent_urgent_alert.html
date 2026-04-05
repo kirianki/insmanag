@@ -1,0 +1,23 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<p>Hello {{ agent_name }},</p>
+
+<p style="color: #e74c3c; font-size: 18px; font-weight: bold;">Urgent Alert: Policies At Risk</p>
+
+<p>The following policies in your portfolio have recently been flagged as <strong>At Risk (Missing Payment)</strong>:
+</p>
+
+<div class="info-box" style="border-left-color: #e74c3c;">
+    <p><strong>Affected Policies ({{ at_risk_count }} total):</strong></p>
+    <p>{{ policy_numbers }}</p>
+</div>
+
+<p>Please contact these customers immediately to assist them with their payments and prevent policy cancellation or
+    lapse in coverage.</p>
+
+<p>You can view full details of these policies on your agent dashboard.</p>
+
+<p>Best regards,<br>
+    Admin System</p>
+{% endblock %}

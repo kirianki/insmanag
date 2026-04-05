@@ -8,21 +8,33 @@ class UserNestedSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'email', 'first_name', 'last_name']
 
-# --- THIS IS THE CORRECTED SERIALIZER ---
+# --- NEW: A simple serializer for nesting customer info in document lists ---
+class CustomerNestedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = ['id', 'customer_number', 'first_name', 'last_name']
+
 class CustomerDocumentSerializer(serializers.ModelSerializer):
     verified_by = UserNestedSerializer(read_only=True)
-    # The 'customer' field is no longer included here because it's handled
-    # by the view using the nested URL. The client does not need to send it.
+    class Meta:
+        model = CustomerDocument
+        fields = [
+            'id', 'document_type', 'document_number', 'expiry_date', 'file',
+            'verification_status', 'verified_by', 'notes', 'is_active', 'created_at'
+        ]
+        read_only_fields = ['id', 'verification_status', 'verified_by', 'created_at']
+
+# --- NEW: A dedicated serializer for the new admin-facing document list view ---
+class CustomerDocumentListSerializer(serializers.ModelSerializer):
+    verified_by = UserNestedSerializer(read_only=True)
+    customer = CustomerNestedSerializer(read_only=True)
 
     class Meta:
         model = CustomerDocument
         fields = [
-            'id', 'document_type', 'file', # <-- 'customer' removed from this list
-            'verification_status', 'verified_by', 'created_at'
+            'id', 'customer', 'document_type', 'document_number', 'expiry_date', 'file',
+            'verification_status', 'verified_by', 'notes', 'is_active', 'created_at'
         ]
-        read_only_fields = ['id', 'verification_status', 'verified_by', 'created_at']
-
-# --- NO OTHER SERIALIZERS NEED TO BE CHANGED ---
 
 class CustomerSerializer(serializers.ModelSerializer):
     documents = CustomerDocumentSerializer(many=True, read_only=True)

@@ -1,16 +1,16 @@
 # apps/claims/views.py
+
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, permissions, exceptions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema_view, extend_schema 
 from django_filters.rest_framework import DjangoFilterBackend
-from django.shortcuts import get_object_or_404
 
-# --- THIS IS THE LINE TO BE ADDED ---
-from .filters import ClaimFilter 
 from .models import Claim, ClaimDocument
 from .serializers import ClaimSerializer, ClaimDocumentSerializer, SettleClaimSerializer
+from .filters import ClaimFilter
 from apps.auditing.mixins import AuditLogMixin
 from apps.accounts.permissions import IsSuperUser, IsAgencyAdmin, IsBranchManager, IsObjectInScope
 from apps.policies.models import Policy
@@ -19,6 +19,7 @@ from apps.customers.models import Customer
 @extend_schema_view(
     list=extend_schema(summary="List Claims (Scoped by Role)"),
     create=extend_schema(summary="Create a new Claim (FNOL)"),
+    start_review=extend_schema(summary="Acknowledge FNOL and Start Review (Admins/Managers only)"),
     approve=extend_schema(summary="Approve a Claim (Admins/Managers only)"),
     settle=extend_schema(summary="Settle a Claim (Admins/Managers only)"),
     reject=extend_schema(summary="Reject a Claim (Admins/Managers only)")
@@ -27,18 +28,21 @@ class ClaimViewSet(AuditLogMixin, viewsets.ModelViewSet):
     serializer_class = ClaimSerializer
     permission_classes = [permissions.IsAuthenticated, IsObjectInScope]
     filter_backends = [DjangoFilterBackend]
-    
-    # --- THIS IS THE MODIFIED LINE ---
-    # We replace filterset_fields with our custom filterset_class.
     filterset_class = ClaimFilter
 
     def get_queryset(self):
         user = self.request.user
         qs = Claim.objects.select_related('policy', 'claimant', 'reported_by', 'agency', 'branch')
-        if user.is_superuser: return qs.all()
-        if user.is_agency_admin: return qs.filter(agency=user.agency)
-        if user.is_branch_manager: return qs.filter(branch=user.branch)
-        if user.is_agent: return qs.filter(policy__agent=user)
+        
+        if user.is_superuser: 
+            return qs.all()
+        if user.is_agency_admin: 
+            return qs.filter(agency=user.agency)
+        if user.is_branch_manager: 
+            return qs.filter(branch=user.branch)
+        if user.is_agent: 
+            return qs.filter(policy__agent=user)
+            
         return Claim.objects.none()
 
     def get_serializer_context(self):
@@ -62,19 +66,41 @@ class ClaimViewSet(AuditLogMixin, viewsets.ModelViewSet):
 
     def get_permissions(self):
         """Set action-level permissions. Admins/Managers can change status."""
-        if self.action in ['approve', 'settle', 'reject', 'destroy']:
+        restricted_actions = ['start_review', 'approve', 'settle', 'reject', 'destroy']
+        if self.action in restricted_actions:
+            # Agents cannot perform these actions, only Admins/Managers
             return [permissions.IsAuthenticated(), (IsSuperUser | IsAgencyAdmin | IsBranchManager)()]
         return super().get_permissions()
 
     def perform_create(self, serializer):
-        serializer.save(reported_by=self.request.user)
+        super().perform_create(serializer, reported_by=self.request.user)
 
     # --- Custom Actions with Audit Logging ---
+
+    @action(detail=True, methods=['post'], url_path='start-review')
+    def start_review(self, request, pk=None):
+        """
+        Moves a claim from FNOL to UNDER_REVIEW.
+        """
+        claim = self.get_object()
+        
+        if claim.status != Claim.Status.FNOL:
+             raise exceptions.ValidationError("Only new claims (FNOL) can be moved to review.")
+        
+        claim.status = Claim.Status.UNDER_REVIEW
+        claim.save(update_fields=['status', 'updated_at'])
+        self._log_action("CLAIM_REVIEW_STARTED", claim)
+        
+        return Response(self.get_serializer(claim).data)
+
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         claim = self.get_object()
+        
+        # Valid previous states for Approval
         if claim.status not in [Claim.Status.UNDER_REVIEW, Claim.Status.AWAITING_DOCS]:
             raise exceptions.ValidationError("Claim can only be approved when 'Under Review' or 'Awaiting Docs'.")
+            
         claim.status = Claim.Status.APPROVED
         claim.save(update_fields=['status', 'updated_at'])
         self._log_action("CLAIM_APPROVED", claim)
@@ -83,6 +109,7 @@ class ClaimViewSet(AuditLogMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], serializer_class=SettleClaimSerializer)
     def settle(self, request, pk=None):
         claim = self.get_object()
+        
         if claim.status != Claim.Status.APPROVED:
             raise exceptions.ValidationError("Claim must be 'Approved' before it can be settled.")
         
@@ -98,8 +125,10 @@ class ClaimViewSet(AuditLogMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         claim = self.get_object()
+        
         if claim.status in [Claim.Status.SETTLED, Claim.Status.CLOSED]:
             raise exceptions.ValidationError("Cannot reject a claim that is already settled or closed.")
+            
         claim.status = Claim.Status.REJECTED
         claim.save(update_fields=['status', 'updated_at'])
         self._log_action("CLAIM_REJECTED", claim)
@@ -119,6 +148,11 @@ class ClaimDocumentViewSet(AuditLogMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Associate the document with the claim from the URL."""
-        claim = get_object_or_4_4(Claim, pk=self.kwargs['claim_pk'])
-        # IsObjectInScope on the viewset already checks if the user can access this claim
-        serializer.save(uploaded_by=self.request.user, claim=claim)
+        claim = get_object_or_404(Claim, pk=self.kwargs['claim_pk'])
+        
+        # Safety check: ensure user has access to this claim via IsObjectInScope logic
+        # Since IsObjectInScope works on the ViewSet object (ClaimDocument), we rely on 
+        # the permission class to check the document, or we can explicitly check the claim here:
+        # if not user_has_access(self.request.user, claim): raise PermissionDenied...
+        
+        super().perform_create(serializer, uploaded_by=self.request.user, claim=claim)

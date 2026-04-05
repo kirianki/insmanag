@@ -5,6 +5,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import SystemLog
 from .serializers import SystemLogSerializer
+from .filters import SystemLogFilter
 from apps.accounts.permissions import IsSuperUser, IsAgencyAdmin, IsBranchManager
 
 @extend_schema_view(
@@ -20,12 +21,7 @@ class SystemLogViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated] # Base permission
     
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = {
-        'action_type': ['exact', 'in'],
-        'user': ['exact'],
-        'branch': ['exact'],
-        'created_at': ['date__gte', 'date__lte'],
-    }
+    filterset_class = SystemLogFilter
 
     def get_queryset(self):
         user = self.request.user

@@ -24,7 +24,7 @@ class CustomerPaymentFactory(DjangoModelFactory):
 class ProviderCommissionStructureFactory(DjangoModelFactory):
     class Meta:
         model = ProviderCommissionStructure
-        django_get_or_create = ('provider', 'policy_type', 'commission_type')
+        django_get_or_create = ('agency', 'provider', 'policy_type', 'commission_type')
 
     provider = factory.SubFactory(InsuranceProviderFactory)
     policy_type = factory.SubFactory(PolicyTypeFactory)

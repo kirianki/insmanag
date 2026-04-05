@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import OrderingFilter # Import the OrderingFilter
 
 from apps.auditing.mixins import AuditLogMixin
 from apps.accounts.permissions import IsAgencyAdmin, IsBranchManager, IsObjectInScope, IsSuperUser
@@ -16,8 +17,11 @@ from .services import PayoutService, CommissionService
 class CustomerPaymentViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CustomerPaymentSerializer
     permission_classes = [permissions.IsAuthenticated, IsObjectInScope]
-    filter_backends = [DjangoFilterBackend]
+    # --- FIX: Added ordering to prevent pagination warnings ---
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['policy', 'customer']
+    ordering_fields = ['payment_date', 'amount']
+    ordering = ['-payment_date'] # Default order: newest payments first
     
     def get_queryset(self):
         user = self.request.user
@@ -29,35 +33,38 @@ class CustomerPaymentViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ProviderCommissionStructureViewSet(AuditLogMixin, viewsets.ModelViewSet):
     serializer_class = ProviderCommissionStructureSerializer
-    # --- CORRECTED: Added () to instantiate the combined permission class ---
     permission_classes = [permissions.IsAuthenticated, (IsSuperUser | IsAgencyAdmin)]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['provider', 'policy_type', 'commission_type']
     
     def get_queryset(self):
-        return ProviderCommissionStructure.objects.filter(agency=self.request.user.agency)
+        # --- FIX: Added default ordering for consistency ---
+        return ProviderCommissionStructure.objects.filter(agency=self.request.user.agency).order_by('provider__name')
     
     def perform_create(self, serializer):
-        serializer.save(agency=self.request.user.agency)
+        super().perform_create(serializer, agency=self.request.user.agency)
 
 class StaffCommissionRuleViewSet(AuditLogMixin, viewsets.ModelViewSet):
     serializer_class = StaffCommissionRuleSerializer
-    # --- CORRECTED: Added () to instantiate the combined permission class ---
     permission_classes = [permissions.IsAuthenticated, (IsSuperUser | IsAgencyAdmin)]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['user', 'policy_type', 'payout_basis']
     
     def get_queryset(self):
-        return StaffCommissionRule.objects.filter(agency=self.request.user.agency)
+        # --- FIX: Added default ordering for consistency ---
+        return StaffCommissionRule.objects.filter(agency=self.request.user.agency).order_by('user__email')
 
     def perform_create(self, serializer):
-        serializer.save(agency=self.request.user.agency)
+        super().perform_create(serializer, agency=self.request.user.agency)
 
 class StaffCommissionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = StaffCommissionSerializer
     permission_classes = [permissions.IsAuthenticated, IsObjectInScope]
-    filter_backends = [DjangoFilterBackend]
+    # --- FIX: Added ordering to prevent potential warnings ---
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['agent', 'policy', 'status', 'payout_batch', 'commission_type']
+    ordering_fields = ['created_at', 'commission_amount']
+    ordering = ['-created_at'] # Default order: newest commissions first
     
     def get_queryset(self):
         user = self.request.user
@@ -69,7 +76,6 @@ class StaffCommissionViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_permissions(self):
         if self.action == 'approve':
-            # --- CORRECTED: Wrapped the entire expression in () to instantiate it ---
             return [permissions.IsAuthenticated(), (IsSuperUser | IsAgencyAdmin | IsBranchManager)()]
         return super().get_permissions()
 
@@ -85,11 +91,13 @@ class StaffCommissionViewSet(viewsets.ReadOnlyModelViewSet):
 @extend_schema_view(create=extend_schema(summary="Create & Initiate a Payout Batch"))
 class PayoutBatchViewSet(viewsets.ModelViewSet):
     serializer_class = PayoutBatchSerializer
-    # --- CORRECTED: Added () to instantiate the combined permission class ---
     permission_classes = [permissions.IsAuthenticated, (IsSuperUser | IsAgencyAdmin)]
     http_method_names = ['get', 'post', 'head', 'options']
-    filter_backends = [DjangoFilterBackend]
+    # --- FIX: Added ordering to prevent pagination warnings ---
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['status']
+    ordering_fields = ['created_at', 'total_amount']
+    ordering = ['-created_at'] # Default order: newest batches first
 
     def get_queryset(self):
         return PayoutBatch.objects.filter(agency=self.request.user.agency)

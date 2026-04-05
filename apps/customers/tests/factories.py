@@ -2,7 +2,7 @@
 import factory
 from factory.django import DjangoModelFactory
 from datetime import date, timedelta
-from ..models import Customer, CustomerDocument, Prospect
+from ..models import Customer, CustomerDocument
 from apps.accounts.tests.factories import UserFactory, AgencyFactory
 
 class CustomerFactory(DjangoModelFactory):
@@ -31,15 +31,3 @@ class CustomerDocumentFactory(DjangoModelFactory):
     customer = factory.SubFactory(CustomerFactory)
     document_type = factory.Iterator(['National ID', 'KRA PIN', 'Passport'])
     file = factory.django.FileField(filename='dummy_doc.pdf')
-
-class ProspectFactory(DjangoModelFactory):
-    class Meta:
-        model = Prospect
-
-    customer = factory.SubFactory(CustomerFactory)
-    created_by = factory.SelfAttribute('customer.assigned_agent')
-    current_insurer = factory.Iterator(['Jubilee', 'Britam', 'ICEA Lion'])
-    policy_type_description = "Motor Private"
-    renewal_date = factory.LazyFunction(lambda: date.today() + timedelta(days=90))
-    premium_estimate = factory.Faker('pydecimal', left_digits=5, right_digits=2, positive=True)
-    notes = factory.Faker('paragraph')

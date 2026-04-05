@@ -32,6 +32,10 @@ class Customer(UUIDModel, TimestampedModel):
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
 
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
     def save(self, *args, **kwargs):
         if not self.customer_number:
             short_uuid = str(uuid.uuid4()).split('-')[0].upper()
@@ -47,12 +51,18 @@ class CustomerDocument(UUIDModel, TimestampedModel):
         PENDING = "PENDING", "Pending"
         VERIFIED = "VERIFIED", "Verified"
         REJECTED = "REJECTED", "Rejected"
+        EXPIRED = "EXPIRED", "Expired"
         
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="documents")
     document_type = models.CharField(max_length=100)
+    document_number = models.CharField(max_length=100, blank=True, null=True)
+    expiry_date = models.DateField(blank=True, null=True)
     file = models.FileField(upload_to='kyc_documents/%Y/%m/')
+    
     verification_status = models.CharField(max_length=20, choices=VerificationStatus.choices, default=VerificationStatus.PENDING)
     verified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    notes = models.TextField(blank=True, null=True, help_text="Internal notes or rejection reason")
+    is_active = models.BooleanField(default=True, help_text="Designates whether this document is currently active")
     
     class Meta:
         ordering = ['-created_at']

@@ -18,3 +18,4 @@ openpyxl
 reportlab
 drf-nested-routers
 django-extensions
+africastalking

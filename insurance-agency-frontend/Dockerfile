@@ -1,28 +1,41 @@
-# Stage 1: Build the Next.js app
-FROM node:20-alpine AS builder
+# ---------- Builder Stage ----------
+FROM node:20-bullseye AS builder
 
 WORKDIR /app
 
-# Install dependencies
-COPY package.json package-lock.json ./
-RUN npm install --legacy-peer-deps
+RUN apt-get update && apt-get install -y \
+    build-essential python3 make g++ libc6-dev git && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy rest of the app and build
+RUN npm install -g pnpm
+
+# Copy package files first for better layer caching
+COPY package.json pnpm-lock.yaml .npmrc* ./
+
+# Install with --ignore-scripts first, then rebuild natives for this platform
+RUN pnpm install --no-frozen-lockfile
+
+# Copy the rest of the source
 COPY . .
-RUN npm run build
 
-# Stage 2: Run the Next.js app
-FROM node:20-alpine AS runner
+# Explicitly rebuild native modules for the current platform
+RUN pnpm rebuild @tailwindcss/oxide
+
+# Build Next.js app
+RUN pnpm build
+
+# ---------- Production Stage ----------
+FROM node:20-bullseye AS runner
 
 WORKDIR /app
 
-# Copy only the necessary files from builder
-COPY --from=builder /app/package.json /app/package-lock.json ./
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/next.config.ts ./next.config.ts
+ENV NODE_ENV=production
+ENV PORT=3001
 
-EXPOSE 3000
+RUN npm install -g pnpm
 
-CMD ["npm", "start"]
+COPY --from=builder /app ./
+
+EXPOSE 3001
+
+CMD ["pnpm", "start"]
