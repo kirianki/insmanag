@@ -134,6 +134,7 @@ class Policy(UUIDModel, TimestampedModel):
     is_installment = models.BooleanField(default=False, help_text="True if a premium-based policy is paid in installments.")
     vehicle_registration_number = models.CharField(max_length=20, blank=True, null=True)
     insurance_certificate_number = models.CharField(max_length=100, blank=True, null=True)
+    insurance_certificate_file = models.FileField(upload_to='policy_certificates/', null=True, blank=True)
     additional_details = JSONField(
         default=dict, blank=True,
         help_text="Flexible field for policy-specific data (e.g., beneficiaries, property address)."

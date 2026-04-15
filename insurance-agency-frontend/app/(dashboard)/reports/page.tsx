@@ -10,7 +10,8 @@ import {
   Users,
   FileText,
   AlertCircle,
-  BarChart3
+  BarChart3,
+  Target
 } from 'lucide-react';
 
 const reportCategories = [
@@ -61,6 +62,22 @@ const reportCategories = [
         icon: FileText,
         color: 'text-indigo-600',
         bgColor: 'bg-indigo-50',
+      },
+      {
+        name: 'Renewal Tracker',
+        description: 'Manual renewal reminders and prospects',
+        href: '/reports/renewal-tracker',
+        icon: Target,
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-50',
+      },
+      {
+        name: 'Upcoming Renewals',
+        description: 'Track policies approaching expiration for timely follow-up',
+        href: '/reports/renewals',
+        icon: AlertCircle,
+        color: 'text-amber-600',
+        bgColor: 'bg-amber-50',
       },
       {
         name: 'Customers',

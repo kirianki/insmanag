@@ -31,14 +31,14 @@ interface ApiError {
 export function CustomerRenewalsTab({ customerId }: { customerId: string }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [selectedRenewal, setSelectedRenewal] = useState<Renewal | undefined>(undefined);
 
-  const queryParams: RenewalFilterParams = { 
-    customer: customerId, 
-    ordering: 'renewal_date' 
+  const queryParams: RenewalFilterParams = {
+    customer: customerId,
+    ordering: 'renewal_date'
   };
 
   const { data: renewalsData, isLoading } = useQuery({
@@ -74,7 +74,7 @@ export function CustomerRenewalsTab({ customerId }: { customerId: string }) {
       toast.error("Update Failed", { description: message });
     },
   });
-  
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteRenewal(id),
     onSuccess: () => {
@@ -127,7 +127,7 @@ export function CustomerRenewalsTab({ customerId }: { customerId: string }) {
               <TableHead>Policy Type</TableHead>
               <TableHead>Current Insurer</TableHead>
               {/* CHANGED: Replaced Estimated Premium with Notes */}
-              <TableHead>Notes</TableHead>
+              <TableHead>Vehicle Reg No</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -146,17 +146,16 @@ export function CustomerRenewalsTab({ customerId }: { customerId: string }) {
                   <TableCell>
                     <div className="flex items-center">
                       <span>{format(new Date(renewal.renewal_date), "PP")}</span>
-                      {differenceInDays(new Date(renewal.renewal_date), new Date()) <= 30 && 
-                       isFuture(new Date(renewal.renewal_date)) && (
-                        <Badge variant="destructive" className="ml-2">Due Soon</Badge>
-                      )}
+                      {differenceInDays(new Date(renewal.renewal_date), new Date()) <= 30 &&
+                        isFuture(new Date(renewal.renewal_date)) && (
+                          <Badge variant="destructive" className="ml-2">Due Soon</Badge>
+                        )}
                     </div>
                   </TableCell>
                   <TableCell>{renewal.policy_type_description}</TableCell>
                   <TableCell>{renewal.current_insurer}</TableCell>
-                  {/* CHANGED: Displaying Notes instead of Premium */}
-                  <TableCell className="max-w-[250px] truncate" title={renewal.notes || ''}>
-                    {renewal.notes || '-'}
+                  <TableCell>
+                    {renewal.vehicle_registration_number || '-'}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -169,8 +168,8 @@ export function CustomerRenewalsTab({ customerId }: { customerId: string }) {
                         <DropdownMenuItem onClick={() => handleOpenEdit(renewal)}>
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-destructive" 
+                        <DropdownMenuItem
+                          className="text-destructive"
                           onClick={() => handleOpenDelete(renewal)}
                         >
                           Delete
@@ -210,7 +209,7 @@ export function CustomerRenewalsTab({ customerId }: { customerId: string }) {
           />
         </DialogContent>
       </Dialog>
-      
+
       <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -221,8 +220,8 @@ export function CustomerRenewalsTab({ customerId }: { customerId: string }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              className="bg-destructive hover:bg-destructive/90" 
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
               onClick={() => deleteMutation.mutate(selectedRenewal!.id)}
             >
               Yes, delete

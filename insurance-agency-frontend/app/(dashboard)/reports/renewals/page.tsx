@@ -9,9 +9,8 @@ import { Download, ArrowLeft, X, Search } from 'lucide-react';
 import Link from 'next/link';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { api } from '@/lib/api';
-import { ReportVisuals } from '../components/ReportVisuals';
 import { DataTable } from '@/components/shared/DataTable';
 import { ColumnDef } from '@tanstack/react-table';
 import { toast } from 'sonner';
@@ -19,40 +18,62 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/lib/auth';
+import { getToolbarDropdownData } from '@/services/policyService';
 
-export default function ClaimsReportPage() {
-    const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+export default function RenewalsReportPage() {
+    const { user } = useAuth();
+    const agencyId = (user as any)?.agency_detail?.id || (user as any)?.agency;
+
+    // Default range: today to 30 days from now
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: new Date(),
+        to: addDays(new Date(), 30)
+    });
     const [status, setStatus] = useState('all');
-    const [viewType, setViewType] = useState<'summary' | 'detail'>('summary');
     const [search, setSearch] = useState('');
+    const [providerId, setProviderId] = useState('all');
 
     const dateFrom = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined;
     const dateTo = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined;
-    const reportType = viewType === 'summary' ? 'claims-summary-overall' : 'claims-detail';
+
+    const { data: dropdownData } = useQuery({
+        queryKey: ['toolbar-dropdown', agencyId],
+        queryFn: () => getToolbarDropdownData(agencyId!),
+        enabled: !!agencyId,
+    });
 
     const { data: rawData, isLoading } = useQuery({
-        queryKey: ['claims-report', reportType, dateFrom, dateTo, status],
+        queryKey: ['renewals-report', dateFrom, dateTo, status],
         queryFn: async () => {
-            const params: Record<string, string> = {};
+            const params: Record<string, string> = { format: 'json' };
             if (dateFrom) params.date_from = dateFrom;
             if (dateTo) params.date_to = dateTo;
             if (status !== 'all') params.status = status;
-            const response = await api.get(`/reports/${reportType}/`, { params });
+            const response = await api.get('/reports/renewals-detail/', { params });
             return response.data as Record<string, unknown>[];
         },
     });
 
-    const reportData = search
-        ? rawData?.filter(row => Object.values(row).some(v => String(v ?? '').toLowerCase().includes(search.toLowerCase())))
-        : rawData;
+    const reportData = rawData?.filter(row => {
+        const providerMatch = providerId === 'all' || String(row['provider__name'] ?? '').toLowerCase() === dropdownData?.providers.find(p => p.id === providerId)?.name?.toLowerCase();
+        const searchMatch = !search || Object.values(row).some(v => String(v ?? '').toLowerCase().includes(search.toLowerCase()));
+        return providerMatch && searchMatch;
+    });
 
     const activeFilters = [
         status !== 'all' && { label: `Status: ${status}`, clear: () => setStatus('all') },
+        providerId !== 'all' && { label: `Provider: ${dropdownData?.providers.find(p => p.id === providerId)?.name}`, clear: () => setProviderId('all') },
         search && { label: `Search: "${search}"`, clear: () => setSearch('') },
-        dateRange && { label: `Date: ${dateFrom} → ${dateTo ?? '…'}`, clear: () => setDateRange(undefined) },
+        dateRange && { label: `Expiry: ${dateFrom} → ${dateTo ?? '…'}`, clear: () => setDateRange(undefined) },
     ].filter(Boolean) as { label: string; clear: () => void }[];
 
-    const handleReset = () => { setStatus('all'); setSearch(''); setDateRange(undefined); };
+    const handleReset = () => {
+        setStatus('all');
+        setProviderId('all');
+        setSearch('');
+        setDateRange({ from: new Date(), to: addDays(new Date(), 30) });
+    };
 
     const handleDownload = () => {
         if (!reportData || reportData.length === 0) { toast.error('No data to export'); return; }
@@ -61,7 +82,7 @@ export default function ClaimsReportPage() {
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = url; link.download = `claims_report_${format(new Date(), 'yyyy-MM-dd')}.csv`; link.click(); URL.revokeObjectURL(url);
+        link.href = url; link.download = `renewals_report_${format(new Date(), 'yyyy-MM-dd')}.csv`; link.click(); URL.revokeObjectURL(url);
         toast.success('Report downloaded');
     };
 
@@ -74,7 +95,7 @@ export default function ClaimsReportPage() {
                 if (typeof val === 'boolean') return val ? 'Yes' : 'No';
                 if (val === null || val === undefined) return '-';
                 if (key.includes('date')) { try { return format(new Date(val as string), 'MMM dd, yyyy'); } catch { return String(val); } }
-                if (key.includes('amount')) { const n = Number(val); return isNaN(n) ? String(val) : `KES ${n.toLocaleString()}`; }
+                if (key.includes('amount') || key.includes('premium')) { const n = Number(val); return isNaN(n) ? String(val) : `KES ${n.toLocaleString()}`; }
                 return String(val);
             }
         }))
@@ -85,7 +106,10 @@ export default function ClaimsReportPage() {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <Link href="/reports"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
-                    <PageHeader title="Claims Report" description={`${reportData?.length ?? 0} results`} />
+                    <PageHeader
+                        title="Upcoming Renewals Report"
+                        description={`${reportData?.length ?? 0} policies expiring in selected period`}
+                    />
                 </div>
                 <Button variant="outline" size="sm" onClick={handleDownload} disabled={!reportData || reportData.length === 0}>
                     <Download className="mr-2 h-4 w-4" /> Export CSV
@@ -96,40 +120,36 @@ export default function ClaimsReportPage() {
                 <CardContent className="pt-6 space-y-4">
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <div className="grid gap-2">
-                            <Label>View Type</Label>
-                            <Select value={viewType} onValueChange={(v) => setViewType(v as 'summary' | 'detail')}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="summary">Summary</SelectItem>
-                                    <SelectItem value="detail">Detail</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Status</Label>
+                            <Label>Policy Status</Label>
                             <Select value={status} onValueChange={setStatus}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Statuses</SelectItem>
-                                    <SelectItem value="FNOL">FNOL</SelectItem>
-                                    <SelectItem value="UNDER_REVIEW">Under Review</SelectItem>
-                                    <SelectItem value="AWAITING_DOCS">Awaiting Docs</SelectItem>
-                                    <SelectItem value="APPROVED">Approved</SelectItem>
-                                    <SelectItem value="SETTLED">Settled</SelectItem>
-                                    <SelectItem value="REJECTED">Rejected</SelectItem>
-                                    <SelectItem value="CLOSED">Closed</SelectItem>
+                                    <SelectItem value="ACTIVE">Active</SelectItem>
+                                    <SelectItem value="EXPIRED">Expired</SelectItem>
+                                    <SelectItem value="LAPSED">Lapsed</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="grid gap-2">
-                            <Label>Date Range (Loss Date)</Label>
+                            <Label>Provider</Label>
+                            <Select value={providerId} onValueChange={setProviderId}>
+                                <SelectTrigger><SelectValue placeholder="All Providers" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Providers</SelectItem>
+                                    {dropdownData?.providers.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Expiry Period</Label>
                             <DateRangePicker date={dateRange} setDate={setDateRange} />
                         </div>
                         <div className="grid gap-2">
-                            <Label>Quick Filter</Label>
+                            <Label>Search</Label>
                             <div className="relative">
                                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search claim, customer..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8" />
+                                <Input placeholder="Policy no., customer..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8" />
                             </div>
                         </div>
                     </div>
@@ -148,22 +168,21 @@ export default function ClaimsReportPage() {
                 </CardContent>
             </Card>
 
-            {isLoading && <div className="text-center py-8 text-muted-foreground">Loading report...</div>}
+            {isLoading && <div className="text-center py-8 text-muted-foreground">Loading renewals data...</div>}
 
             {!isLoading && reportData && reportData.length > 0 && (
-                <div className="space-y-6">
-                    {viewType === 'summary' && <ReportVisuals data={reportData} reportType={reportType} />}
-                    <Card>
-                        <CardContent className="pt-6">
-                            {viewType === 'detail' && <div className="mb-4 text-sm text-muted-foreground">Showing {reportData.length} claims</div>}
-                            <DataTable columns={columns} data={reportData} isLoading={isLoading} />
-                        </CardContent>
-                    </Card>
-                </div>
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="mb-4 text-sm font-medium text-emerald-700 bg-emerald-50 p-2 rounded-md inline-block">
+                            Found {reportData.length} policies expiring soon
+                        </div>
+                        <DataTable columns={columns} data={reportData} isLoading={isLoading} />
+                    </CardContent>
+                </Card>
             )}
 
             {!isLoading && reportData && reportData.length === 0 && (
-                <Card><CardContent className="pt-6 text-center text-muted-foreground">No claims found for the selected filters.</CardContent></Card>
+                <Card><CardContent className="pt-6 text-center text-muted-foreground">No policies found expiring in the selected range.</CardContent></Card>
             )}
         </div>
     );

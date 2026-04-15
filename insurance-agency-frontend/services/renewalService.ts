@@ -19,6 +19,7 @@ export interface RenewalPayload {
   policy_type_description: string;
   current_insurer?: string | null;
   premium_estimate?: string | null;
+  vehicle_registration_number?: string | null;
   notes?: string | null;
 }
 

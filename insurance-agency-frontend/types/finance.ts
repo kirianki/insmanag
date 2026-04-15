@@ -59,6 +59,7 @@ export interface AgencyRevenue {
     provider_name?: string;
     policy_type_name?: string;
     customer_name?: string;
+    vehicle_registration_number?: string;
 }
 
 export interface DeductionType {

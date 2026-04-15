@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   Home, Users, FileText, Briefcase, HandCoins, Building, Settings,
   ShieldCheck, UserCog, BarChart2, LucideIcon, DollarSign, ChevronDown,
-  TrendingUp, AlertCircle, UserCheck
+  TrendingUp, AlertCircle, UserCheck, Target
 } from 'lucide-react';
 import { cn, getUserRoles, Role } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
@@ -44,6 +44,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
       { href: '/reports/revenue', label: 'Revenue Breakdown', icon: FileText },
       { href: '/reports/commissions', label: 'Commissions', icon: HandCoins },
       { href: '/reports/sales', label: 'Sales Summary', icon: BarChart2 },
+      { href: '/reports/renewals', label: 'Upcoming Renewals', icon: AlertCircle },
+      { href: '/reports/renewal-tracker', label: 'Renewal Tracker', icon: Target },
       { href: '/reports/policies', label: 'Policies', icon: FileText },
       { href: '/reports/customers', label: 'Customers', icon: Users },
       { href: '/reports/claims', label: 'Claims', icon: AlertCircle },

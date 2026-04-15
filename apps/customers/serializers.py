@@ -87,6 +87,7 @@ class RenewalSerializer(serializers.ModelSerializer):
         model = Renewal
         fields = [
             'id', 'customer', 'customer_name', 'created_by', 'current_insurer',
-            'policy_type_description', 'renewal_date', 'premium_estimate', 'notes'
+            'policy_type_description', 'vehicle_registration_number', 
+            'renewal_date', 'premium_estimate', 'notes'
         ]
         read_only_fields = ['id', 'customer_name', 'created_by']

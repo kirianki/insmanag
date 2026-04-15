@@ -31,6 +31,11 @@ export const columns: ColumnDef<AgencyRevenue>[] = [
         header: "Provider",
     },
     {
+        accessorKey: "vehicle_registration_number",
+        header: "Vehicle Reg",
+        cell: ({ row }) => row.getValue("vehicle_registration_number") || "-",
+    },
+    {
         accessorKey: "policy_type_name",
         header: "Policy Type",
     },

@@ -24,7 +24,7 @@ class PolicyNumberService:
 class PolicyService:
     @staticmethod
     @transaction.atomic
-    def activate_policy(policy, insurance_certificate_number: str, start_date: datetime.date = None, end_date: datetime.date = None):
+    def activate_policy(policy, insurance_certificate_number: str, insurance_certificate_file=None, start_date: datetime.date = None, end_date: datetime.date = None):
         """
         Activates a policy that is in a 'Paid - Pending Activation' state.
         This single method handles all policy types intelligently.
@@ -36,6 +36,11 @@ class PolicyService:
 
         policy.insurance_certificate_number = insurance_certificate_number
         update_fields = ['status', 'insurance_certificate_number', 'updated_at']
+        
+        if insurance_certificate_file:
+            policy.insurance_certificate_file = insurance_certificate_file
+            update_fields.append('insurance_certificate_file')
+
         if start_date: policy.policy_start_date = start_date; update_fields.append('policy_start_date')
         if end_date: policy.policy_end_date = end_date; update_fields.append('policy_end_date')
 
@@ -82,6 +87,8 @@ class PolicyService:
     def record_payment_for_policy(policy, amount: Decimal, transaction_reference: str):
         """Records a partial or full payment for a NON-INSTALLMENT, PREMIUM-BASED policy."""
         from .models import Policy
+        from django.db import IntegrityError
+        
         if policy.is_installment:
             raise ValueError("This payment method is for non-installment policies only.")
         if policy.status not in [Policy.Status.AWAITING_PAYMENT, Policy.Status.PARTIALLY_PAID]:
@@ -89,7 +96,13 @@ class PolicyService:
         if amount > policy.balance_due:
             raise ValueError(f"Payment amount ({amount}) exceeds the balance due ({policy.balance_due}).")
 
-        CustomerPayment.objects.create(customer=policy.customer, policy=policy, amount=amount, mpesa_reference=transaction_reference, payment_date=timezone.now())
+        ref = transaction_reference if transaction_reference and transaction_reference.strip() else f"MANUAL_{uuid.uuid4().hex[:10].upper()}"
+
+        try:
+            CustomerPayment.objects.create(customer=policy.customer, policy=policy, amount=amount, mpesa_reference=ref, payment_date=timezone.now())
+        except IntegrityError:
+            raise ValueError(f"Transaction reference '{ref}' already exists. Please use a unique reference.")
+            
         policy.refresh_from_db()
 
         if policy.amount_paid >= policy.premium_amount:
@@ -104,12 +117,21 @@ class PolicyService:
     def record_installment_payment(installment, paid_on: datetime.date, transaction_reference: str):
         """Records a payment for an installment and updates the parent policy's lifecycle."""
         from .models import Policy, PolicyInstallment
+        from django.db import IntegrityError
 
         if installment.status == PolicyInstallment.Status.PAID:
             raise ValueError("This installment has already been paid.")
 
-        installment.status = PolicyInstallment.Status.PAID; installment.paid_on = paid_on; installment.transaction_reference = transaction_reference
-        installment.save()
+        ref = transaction_reference if transaction_reference and transaction_reference.strip() else f"MANUAL_{uuid.uuid4().hex[:10].upper()}"
+        
+        installment.status = PolicyInstallment.Status.PAID
+        installment.paid_on = paid_on
+        installment.transaction_reference = ref
+        
+        try:
+            installment.save()
+        except IntegrityError:
+            raise ValueError(f"Transaction reference '{ref}' already exists. Please use a unique reference.")
         policy = installment.policy
 
         is_first_payment = not policy.installments.filter(status=PolicyInstallment.Status.PAID).exclude(pk=installment.pk).exists()
@@ -133,14 +155,29 @@ class PolicyService:
     def record_recurring_payment(policy, amount: Decimal, transaction_reference: str):
         """Records a payment for a recurring policy and updates its lifecycle state."""
         from .models import Policy, PolicyType
+        from django.db import IntegrityError
 
         if policy.policy_type.payment_structure != PolicyType.PaymentStructure.RECURRING_FEE:
             raise ValueError("This payment method is for recurring fee policies only.")
 
+        ref = transaction_reference if transaction_reference and transaction_reference.strip() else f"MANUAL_{uuid.uuid4().hex[:10].upper()}"
+
+        def _create_payment():
+            try:
+                return CustomerPayment.objects.create(
+                    customer=policy.customer, 
+                    policy=policy, 
+                    amount=amount, 
+                    mpesa_reference=ref, 
+                    payment_date=timezone.now()
+                )
+            except IntegrityError:
+                raise ValueError(f"Transaction reference '{ref}' already exists. Please use a unique reference.")
+
         # --- FIX: Handle initial vs. subsequent payments for recurring policies ---
         if policy.status == Policy.Status.AWAITING_PAYMENT:
             # This is the FIRST payment. Move to pending activation.
-            CustomerPayment.objects.create(customer=policy.customer, policy=policy, amount=amount, mpesa_reference=transaction_reference, payment_date=timezone.now())
+            _create_payment()
             policy.status = Policy.Status.PAID_PENDING_ACTIVATION
             policy.save(update_fields=['status', 'updated_at'])
             # next_due_date is set upon activation, not here.
@@ -150,7 +187,7 @@ class PolicyService:
             if not policy.payment_frequency:
                 raise ValueError("Policy is missing payment_frequency.")
 
-            CustomerPayment.objects.create(customer=policy.customer, policy=policy, amount=amount, mpesa_reference=transaction_reference, payment_date=timezone.now())
+            _create_payment()
 
             frequency_map = {
                 Policy.PaymentFrequency.MONTHLY: relativedelta(months=1),

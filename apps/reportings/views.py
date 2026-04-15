@@ -1,4 +1,5 @@
 import csv
+from django.db import models
 from django.utils import timezone
 from django.http import HttpResponse
 from rest_framework.views import APIView
@@ -12,23 +13,41 @@ from apps.accounts.permissions import IsSuperUser, IsAgencyAdmin, IsBranchManage
 from .services import ReportingService
 from apps.policies.models import Policy
 from apps.commissions.models import StaffCommission
-from apps.customers.models import Lead, Customer
+from apps.customers.models import Lead, Customer, Renewal
 from apps.claims.models import Claim
 
 def apply_date_filters(queryset, date_from_str, date_to_str, date_field='created_at'):
     """Helper to apply date range filtering to a queryset."""
     filters = {}
+    
+    # Check if the field is a DateTimeField to decide whether to use __date lookup
+    is_datetime = True
+    try:
+        # Handle simple case (no joins)
+        if "__" not in date_field:
+            field = queryset.model._meta.get_field(date_field)
+            if not isinstance(field, models.DateTimeField):
+                is_datetime = False
+        else:
+            if any(k in date_field for k in ['start_date', 'end_date', 'due_date']):
+                is_datetime = False
+    except (AttributeError, models.FieldDoesNotExist):
+        # Fallback heuristic if field lookup fails
+        if any(k in date_field for k in ['start_date', 'end_date', 'due_date']):
+            is_datetime = False
+
+    suffix = "__date" if is_datetime else ""
+
     if date_from_str:
         try:
-            # We use make_aware to ensure the date is interpreted in the CURRENT time zone
             dt = timezone.datetime.strptime(date_from_str, "%Y-%m-%d")
-            filters[f"{date_field}__date__gte"] = dt.date()
+            filters[f"{date_field}{suffix}__gte"] = dt.date()
         except ValueError:
             raise exceptions.ValidationError({"date_from": "Invalid date format. Use YYYY-MM-DD."})
     if date_to_str:
         try:
             dt = timezone.datetime.strptime(date_to_str, "%Y-%m-%d")
-            filters[f"{date_field}__date__lte"] = dt.date()
+            filters[f"{date_field}{suffix}__lte"] = dt.date()
         except ValueError:
             raise exceptions.ValidationError({"date_to": "Invalid date format. Use YYYY-MM-DD."})
     return queryset.filter(**filters)
@@ -53,9 +72,11 @@ class ReportGeneratorView(APIView):
         'claims-summary-overall': {'func': ReportingService.generate_overall_claims_summary, 'model': Claim, 'scope_field': 'policy__agent'},
         
         # Detail Reports
-        'policies-detail': {'func': ReportingService.generate_policies_detail_report, 'model': Policy, 'scope_field': 'agent'},
-        'customers-detail': {'func': ReportingService.generate_customers_detail_report, 'model': Customer, 'scope_field': 'assigned_agent'},
-        'claims-detail': {'func': ReportingService.generate_claims_detail_report, 'model': Claim, 'scope_field': 'policy__agent'},
+        'policies-detail': {'func': ReportingService.generate_policies_detail_report, 'model': Policy, 'scope_field': 'agent', 'date_field': 'created_at'},
+        'renewals-detail': {'func': ReportingService.generate_policies_detail_report, 'model': Policy, 'scope_field': 'agent', 'date_field': 'policy_end_date'},
+        'customers-detail': {'func': ReportingService.generate_customers_detail_report, 'model': Customer, 'scope_field': 'assigned_agent', 'date_field': 'created_at'},
+        'claims-detail': {'func': ReportingService.generate_claims_detail_report, 'model': Claim, 'scope_field': 'policy__agent', 'date_field': 'created_at'},
+        'renewal-tracker-detail': {'func': ReportingService.generate_renewals_tracker_report, 'model': Renewal, 'scope_field': 'customer__assigned_agent', 'date_field': 'renewal_date'},
     }
 
     @extend_schema(
@@ -105,7 +126,8 @@ class ReportGeneratorView(APIView):
         # --- 2. Apply common filters ---
         date_from = request.query_params.get("date_from")
         date_to = request.query_params.get("date_to")
-        qs = apply_date_filters(qs, date_from, date_to)
+        date_field = report_config.get('date_field', 'created_at')
+        qs = apply_date_filters(qs, date_from, date_to, date_field=date_field)
 
         # --- 3. Pass all other query params as specific filters to the service ---
         other_filters = {k: v for k, v in request.query_params.items() if k not in ['date_from', 'date_to', 'format']}

@@ -119,6 +119,7 @@ class AgencyRevenueSerializer(serializers.ModelSerializer):
     provider_name = serializers.CharField(source='policy.provider.name', read_only=True)
     policy_type_name = serializers.CharField(source='policy.policy_type.name', read_only=True)
     customer_name = serializers.CharField(source='policy.customer.__str__', read_only=True)
+    vehicle_registration_number = serializers.CharField(source='policy.vehicle_registration_number', read_only=True)
     
     class Meta:
         model = AgencyRevenue

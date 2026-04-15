@@ -141,7 +141,8 @@ class ReportingService:
         ).values(
             'policy_number', 'customer_name', 'agent_name', 
             'provider__name', 'policy_type__name', 'premium_amount',
-            'policy_start_date', 'policy_end_date', 'status', 'created_at'
+            'policy_start_date', 'policy_end_date', 'status', 
+            'vehicle_registration_number', 'created_at'
         ).order_by('-created_at'))
 
     @staticmethod
@@ -174,3 +175,19 @@ class ReportingService:
             'claim_number', 'policy__policy_number', 'claimant_name', 'agent_name',
             'date_of_loss', 'status', 'estimated_loss_amount', 'settled_amount', 'created_at'
         ).order_by('-created_at'))
+    @staticmethod
+    def generate_renewals_tracker_report(renewals_qs, **filters):
+        """Generates a detailed report of manual renewal trackers."""
+        if 'customer_id' in filters and filters['customer_id']:
+            renewals_qs = renewals_qs.filter(customer_id=filters['customer_id'])
+
+        from django.db.models import Value
+        from django.db.models.functions import Concat
+        return list(renewals_qs.annotate(
+            customer_name=Concat('customer__first_name', Value(' '), 'customer__last_name'),
+            creator_name=Concat('created_by__first_name', Value(' '), 'created_by__last_name')
+        ).values(
+            'customer_name', 'creator_name', 'current_insurer', 
+            'policy_type_description', 'vehicle_registration_number', 
+            'renewal_date', 'premium_estimate', 'notes'
+        ).order_by('renewal_date'))

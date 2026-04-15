@@ -112,6 +112,7 @@ class Renewal(UUIDModel, TimestampedModel):
     
     current_insurer = models.CharField(max_length=255, help_text="Name of the current insurance provider")
     policy_type_description = models.CharField(max_length=255, help_text="e.g., Motor Private, Home Insurance")
+    vehicle_registration_number = models.CharField(max_length=50, blank=True, null=True)
     renewal_date = models.DateField(db_index=True)
     
     premium_estimate = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)

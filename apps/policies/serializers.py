@@ -156,13 +156,28 @@ class InstallmentPaymentSerializer(serializers.Serializer):
     paid_on = serializers.DateField()
     transaction_reference = serializers.CharField(required=False, allow_blank=True)
 
+    def validate_transaction_reference(self, value):
+        if value and value.strip():
+            from apps.commissions.models import CustomerPayment
+            if CustomerPayment.objects.filter(mpesa_reference=value).exists():
+                raise serializers.ValidationError(f"Transaction reference '{value}' has already been used.")
+        return value
+
 
 class RecurringPaymentSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     transaction_reference = serializers.CharField(required=False, allow_blank=True)
+
     def validate_amount(self, value):
         if value <= 0:
             raise serializers.ValidationError("Payment amount must be a positive number.")
+        return value
+
+    def validate_transaction_reference(self, value):
+        if value and value.strip():
+            from apps.commissions.models import CustomerPayment
+            if CustomerPayment.objects.filter(mpesa_reference=value).exists():
+                raise serializers.ValidationError(f"Transaction reference '{value}' has already been used.")
         return value
 
 

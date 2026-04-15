@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -42,6 +43,7 @@ const renewalSchema = z.object({
     }, z.number().optional())
     .optional(),
   notes: z.string().optional(),
+  vehicle_registration_number: z.string().optional(),
 });
 
 type RenewalFormData = z.infer<typeof renewalSchema>;
@@ -77,8 +79,24 @@ export function RenewalForm({
           ? Number(renewal.premium_estimate)
           : undefined,
       notes: renewal?.notes || '',
+      vehicle_registration_number: renewal?.vehicle_registration_number || '',
     },
   });
+
+  // Auto-extract vehicle registration from notes if the field is empty
+  const watchedNotes = form.watch('notes');
+  const watchedVehicleReg = form.watch('vehicle_registration_number');
+
+  useEffect(() => {
+    if (!watchedVehicleReg && watchedNotes) {
+      const pattern = /K[A-Z]{2}\s?\d{3}[A-Z]/i;
+      const match = watchedNotes.match(pattern);
+      if (match) {
+        const extracted = match[0].toUpperCase().replace(/\s/g, '');
+        form.setValue('vehicle_registration_number', extracted, { shouldDirty: true });
+      }
+    }
+  }, [watchedNotes, watchedVehicleReg, form]);
 
   const handleFormSubmit = (data: RenewalFormData) => {
     const payload: RenewalPayload = {
@@ -152,6 +170,20 @@ export function RenewalForm({
                   // keep input friendly: show empty string for undefined
                   value={field.value ?? ''}
                 />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="vehicle_registration_number"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Vehicle Registration Number (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g., KAA 001A" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
