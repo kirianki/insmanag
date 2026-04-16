@@ -12,6 +12,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!insurance-agency-frontend/lib/
 lib64/
 parts/
 sdist/
