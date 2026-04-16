@@ -9,6 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend, FilterSet, DateFi
 from rest_framework.filters import SearchFilter, OrderingFilter
 
 from apps.accounts.models import Agency, User
+from apps.core.pagination import LargeResultsSetPagination
 from apps.customers.models import Customer
 from apps.accounts.permissions import (IsAgencyAdmin, IsAgent, IsBranchManager, IsObjectInScope, IsSuperUser)
 from apps.auditing.mixins import AuditLogMixin
@@ -50,6 +51,7 @@ class InsuranceProviderViewSet(AuditLogMixin, viewsets.ModelViewSet):
     filterset_fields = ['is_active', 'country', 'city']
     search_fields = ['name', 'short_name', 'email']
     ordering = ['name']
+    pagination_class = LargeResultsSetPagination
 
     def get_queryset(self):
         user = self.request.user
@@ -76,6 +78,7 @@ class PolicyTypeViewSet(AuditLogMixin, viewsets.ModelViewSet):
     filterset_fields = ['is_active', 'payment_structure', 'requires_vehicle_reg']
     search_fields = ['name']
     ordering = ['name']
+    pagination_class = LargeResultsSetPagination
 
     def get_queryset(self):
         return PolicyType.objects.filter(agency_id=self.kwargs['agency_pk'])
@@ -106,6 +109,7 @@ class PolicyViewSet(AuditLogMixin, viewsets.ModelViewSet):
     filterset_class = PolicyFilter
     search_fields = ['policy_number', 'customer__first_name', 'customer__last_name', 'vehicle_registration_number']
     ordering = ['-created_at']
+    pagination_class = LargeResultsSetPagination
 
     def get_queryset(self):
         user = self.request.user

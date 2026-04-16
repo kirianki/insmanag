@@ -12,6 +12,7 @@ from .models import Claim, ClaimDocument
 from .serializers import ClaimSerializer, ClaimDocumentSerializer, SettleClaimSerializer
 from .filters import ClaimFilter
 from apps.auditing.mixins import AuditLogMixin
+from apps.core.pagination import LargeResultsSetPagination
 from apps.accounts.permissions import IsSuperUser, IsAgencyAdmin, IsBranchManager, IsObjectInScope
 from apps.policies.models import Policy
 from apps.customers.models import Customer
@@ -29,6 +30,7 @@ class ClaimViewSet(AuditLogMixin, viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsObjectInScope]
     filter_backends = [DjangoFilterBackend]
     filterset_class = ClaimFilter
+    pagination_class = LargeResultsSetPagination
 
     def get_queryset(self):
         user = self.request.user

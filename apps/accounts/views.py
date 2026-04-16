@@ -13,6 +13,7 @@ from django.contrib.auth.models import Group, Permission
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from apps.auditing.mixins import AuditLogMixin
+from apps.core.pagination import LargeResultsSetPagination
 from .models import Agency, AgencyBranch, User
 from .permissions import IsAgencyAdmin, IsObjectInScope, IsSuperUser
 from .serializers import (
@@ -124,6 +125,7 @@ class AgencyBranchViewSet(AuditLogMixin, viewsets.ModelViewSet):
 class UserViewSet(AuditLogMixin, viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated, IsObjectInScope]
+    pagination_class = LargeResultsSetPagination
 
     def get_queryset(self):
         user: User = self.request.user

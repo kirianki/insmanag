@@ -1,4 +1,4 @@
-import { api } from '@/lib/api';
+import { api, fetchAllPages } from '@/lib/api';
 import {
   InstallmentPaymentRequest,
   PaginatedPolicyInstallmentList,
@@ -21,52 +21,6 @@ import {
   InsuranceProviderList,
   PaymentFrequency
 } from '@/types/api';
-
-// Define a generic type for any paginated response from your API
-interface PaginatedResponse<T> {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-}
-
-// Helper function to automatically fetch all pages from a paginated endpoint.
-const fetchAllPages = async <T,>(
-  initialUrl: string,
-  initialParams?: Record<string, any>
-): Promise<T[]> => {
-  let allItems: T[] = [];
-  let nextUrl: string | null = null;
-
-  try {
-    const initialResponse = await api.get<PaginatedResponse<T>>(initialUrl, {
-      params: initialParams,
-    });
-
-    allItems = initialResponse.data.results || [];
-    nextUrl = initialResponse.data.next;
-
-    while (nextUrl) {
-      // ✅ FIX: Instead of stripping the string, extract the page number/query string
-      // This avoids the "Double API" prefix issue entirely
-      const urlObj = new URL(nextUrl);
-      const nextParams = Object.fromEntries(urlObj.searchParams.entries());
-
-      // Use the clean initialUrl with the new params (like ?page=2)
-      const subsequentResponse = await api.get<PaginatedResponse<T>>(initialUrl, {
-        params: { ...initialParams, ...nextParams },
-      });
-
-      allItems = allItems.concat(subsequentResponse.data.results || []);
-      nextUrl = subsequentResponse.data.next;
-    }
-
-    return allItems;
-  } catch (error: any) {
-    console.error(`Error fetching all pages for ${initialUrl}:`, error);
-    return allItems;
-  }
-};
 
 
 // ===================================
@@ -248,11 +202,13 @@ export interface DropdownData {
 
 export const getCreatePolicyDropdownData = async (agencyId: string): Promise<DropdownData> => {
   try {
+    // page_size=500 matches LargeResultsSetPagination.max_page_size on the backend,
+    // so all records are returned in a single request per endpoint.
     const results = await Promise.allSettled([
-      fetchAllPages<Customer>('/customers/', { agency_id: agencyId }),
-      fetchAllPages<User>('/accounts/users/', { agency: agencyId }),
-      fetchAllPages<InsuranceProviderList>('/insurance-providers/', { is_active: true }),
-      fetchAllPages<PolicyType>(`/agencies/${agencyId}/policy-types/`, { is_active: true }),
+      fetchAllPages<Customer>('/customers/', { page_size: 500 }),
+      fetchAllPages<User>('/accounts/users/', { agency: agencyId, page_size: 500 }),
+      fetchAllPages<InsuranceProviderList>('/insurance-providers/', { is_active: true, page_size: 500 }),
+      fetchAllPages<PolicyType>(`/agencies/${agencyId}/policy-types/`, { is_active: true, page_size: 500 }),
     ]);
 
     const getDataFromResult = <T,>(result: PromiseSettledResult<T[]>, index: number): T[] => {
@@ -281,8 +237,8 @@ export interface ToolbarDropdownData {
 export const getToolbarDropdownData = async (agencyId: string): Promise<ToolbarDropdownData> => {
   try {
     const results = await Promise.allSettled([
-      fetchAllPages<InsuranceProviderList>('/insurance-providers/', { is_active: true }),
-      fetchAllPages<PolicyType>(`/agencies/${agencyId}/policy-types/`, { is_active: true }),
+      fetchAllPages<InsuranceProviderList>('/insurance-providers/', { is_active: true, page_size: 500 }),
+      fetchAllPages<PolicyType>(`/agencies/${agencyId}/policy-types/`, { is_active: true, page_size: 500 }),
     ]);
     const getDataFromResult = <T,>(result: PromiseSettledResult<T[]>): T[] => {
       if (result.status === 'fulfilled') return result.value;

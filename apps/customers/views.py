@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from apps.accounts.permissions import (IsAgencyAdmin, IsAgent, IsBranchManager,
                                        IsObjectInScope, IsSuperUser)
 from apps.auditing.mixins import AuditLogMixin
+from apps.core.pagination import LargeResultsSetPagination
 
 from .models import Customer, CustomerDocument, Lead, Renewal
 # FIX 1: Import the specific permission for Renewals
@@ -89,6 +90,7 @@ class CustomerViewSet(AuditLogMixin, viewsets.ModelViewSet):
     filter_backends = [filters.DjangoFilterBackend, SearchFilter]
     filterset_fields = ['assigned_agent__id', 'kyc_status']
     search_fields = ['first_name', 'last_name', 'email', 'phone']
+    pagination_class = LargeResultsSetPagination
 
     def get_queryset(self):
         """
